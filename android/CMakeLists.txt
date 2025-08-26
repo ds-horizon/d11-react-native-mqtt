@@ -47,5 +47,6 @@ target_link_libraries(
         log
         android
 )
+target_link_options(${PACKAGE_NAME} PRIVATE "-Wl,-z,max-page-size=16384")
 
 

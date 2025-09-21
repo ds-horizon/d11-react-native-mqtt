@@ -44,13 +44,14 @@ class MqttHelper {
         mqtt.enableSSL = enableSslConfig
 
         if mqtt.clientID == clientId && mqtt.host == host && mqtt.port == UInt16(port) {
-            emitJsiEvent(clientId + CLIENT_INITIALIZE_EVENT, ["clientInit": true])
+            emitJsiEvent(CLIENT_INITIALIZE_EVENT, ["clientInit": true, "clientId": clientId])
         } else {
-            emitJsiEvent(clientId + ERROR_EVENT, [
+            emitJsiEvent(ERROR_EVENT, [
                 "clientInit": false,
                 "errorMessage": "Failed to initialize MQTT client",
                 "errorType": "INITIALIZATION",
-                "reasonCode": INITIALIZATION_ERROR
+                "reasonCode": INITIALIZATION_ERROR,
+                "clientId": clientId
             ])
         }
     }
@@ -117,11 +118,11 @@ class MqttHelper {
 extension MqttHelper: CocoaMQTT5Delegate {
     func mqtt5(_ mqtt5: CocoaMQTT5, didConnectAck ack: CocoaMQTTCONNACKReasonCode, connAckData: MqttDecodeConnAck?) {
         if (ack != .success) {
-            emitJsiEvent(clientId + DISCONNECTED_EVENT, ["reasonCode": ack.rawValue])
+            emitJsiEvent(DISCONNECTED_EVENT, ["reasonCode": ack.rawValue, "clientId": clientId])
             return
         }
 
-        emitJsiEvent(clientId + CONNECTED_EVENT, ["reasonCode": ack.rawValue])
+        emitJsiEvent(CONNECTED_EVENT, ["reasonCode": ack.rawValue, "clientId": clientId])
 
         for (topic, idSubscriptionMap) in subscriptionMap {
             if let maxQos = idSubscriptionMap.values.max(by: { $0.qos < $1.qos })?.qos {
@@ -145,7 +146,7 @@ extension MqttHelper: CocoaMQTT5Delegate {
     func mqtt5(_ mqtt5: CocoaMQTT5, didReceiveMessage message: CocoaMQTT5Message, id: UInt16, publishData: MqttDecodePublish?) {
         if let allSubscriptionsForTopic = subscriptionMap[message.topic] {
             for eventId in allSubscriptionsForTopic.keys {
-                emitJsiEvent(eventId, ["payload": message.string ?? "", "topic": message.topic, "qos": message.qos.rawValue])
+                emitJsiEvent("subscription_event", ["payload": message.string ?? "", "topic": message.topic, "qos": message.qos.rawValue, "eventId": eventId])
                 print("message ", message.string ?? "")
             }
         }
@@ -156,7 +157,7 @@ extension MqttHelper: CocoaMQTT5Delegate {
         for (topic, qos) in success {
             if let topic = topic as? String, let qosValue = qos as? NSNumber, let allSubscriptionsForTopic = subscriptionMap[topic] {
               for eventId in allSubscriptionsForTopic.keys {
-                emitJsiEvent(eventId + SUBSCRIBE_SUCCESS, ["message": "", "qos": qosValue.intValue, "topic": topic]) // TODO: get actual error message
+                emitJsiEvent(SUBSCRIBE_SUCCESS, ["message": "", "qos": qosValue.intValue, "topic": topic, "eventId": eventId]) // TODO: get actual error message
               }
             }
         }
@@ -165,10 +166,11 @@ extension MqttHelper: CocoaMQTT5Delegate {
         for topic in failed {
             if let allSubscriptionsForTopic = subscriptionMap[topic] {
                 for eventId in allSubscriptionsForTopic.keys {
-                    emitJsiEvent(eventId + SUBSCRIBE_FAILED, [
+                    emitJsiEvent(SUBSCRIBE_FAILED, [
                         "errorMessage": "Failed to subscribe to topic: \(topic)",
                         "topic": topic,
-                        "reasonCode": SUBSCRIPTION_ERROR
+                        "reasonCode": SUBSCRIPTION_ERROR,
+                        "eventId": eventId
                     ])
                 }
             }
@@ -191,18 +193,25 @@ extension MqttHelper: CocoaMQTT5Delegate {
     }
 
     func mqtt5DidDisconnect(_ mqtt5: CocoaMQTT5, withError err: Error?) {
-        let reasonCode = DISCONNECTION_ERROR
+        let reasonCode: Int
         var errorMessage = ""
       
         if let error = err {
+            // Error disconnection
+            reasonCode = DISCONNECTION_ERROR
             errorMessage = error.localizedDescription
+        } else {
+            // Normal disconnection
+            reasonCode = 0 // NORMAL_DISCONNECTION
+            errorMessage = ""
         }
         
         let params: [String: Any] = [
             "reasonCode": reasonCode,
             "errorMessage": errorMessage
         ]
-        emitJsiEvent(clientId + DISCONNECTED_EVENT, params)
+        let paramsWithClientId = params.merging(["clientId": clientId]) { (_, new) in new }
+        emitJsiEvent(DISCONNECTED_EVENT, paramsWithClientId)
     }
 }
 

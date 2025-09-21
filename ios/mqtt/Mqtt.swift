@@ -56,7 +56,7 @@ public class Mqtt: NSObject, MqttDelegate {
     
     @objc
     public func getConnectionStatusMqtt(_ clientId: String) -> String {
-        return MqttManager.shared.getConnectionStatusMqtt(clientId)
         print("getConnectionStatusMqtt MQTT CALLED")
+        return MqttManager.shared.getConnectionStatusMqtt(clientId)
     }
 }

@@ -14,18 +14,24 @@ export const createMqttClient = (
   config: MqttConfig
 ): Promise<MqttClient | undefined> => {
   const eventEmitter: EventEmitter = EventEmitter.getInstance();
-  const eventName = config.clientId + MQTT_EVENTS.CLIENT_INITIALIZE_EVENT;
+  const eventName = MQTT_EVENTS.CLIENT_INITIALIZE_EVENT;
 
   return new Promise<MqttClient | undefined>((resolve) => {
     const listener = eventEmitter.addListener(
       eventName,
-      (ack: MqttEventsInterface[MQTT_EVENTS.CLIENT_INITIALIZE_EVENT]) => {
-        if (ack.clientInit) {
-          resolve(client);
-        } else {
-          resolve(undefined);
+      (
+        ack: MqttEventsInterface[MQTT_EVENTS.CLIENT_INITIALIZE_EVENT] & {
+          clientId: string;
         }
-        listener.remove();
+      ) => {
+        if (ack.clientId === config.clientId) {
+          if (ack.clientInit) {
+            resolve(client);
+          } else {
+            resolve(undefined);
+          }
+          listener.remove();
+        }
       }
     );
 

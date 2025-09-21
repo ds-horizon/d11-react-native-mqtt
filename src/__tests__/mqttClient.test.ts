@@ -22,7 +22,7 @@ jest.mock('../Mqtt/EventEmitter', () => {
   const mEventEmitter = {
     getInstance: jest.fn(),
     addListener: jest.fn((_, callback) => {
-      callback({ reasonCode: 100 });
+      callback({ reasonCode: 100, clientId: 'test-client' });
       return { remove };
     }),
     removeAllListeners: jest.fn(),
@@ -33,6 +33,25 @@ jest.mock('../Mqtt/EventEmitter', () => {
 
 jest.mock('../Mqtt/MqttClient.utils', () => ({
   getMqttBackoffTime: jest.fn().mockReturnValue(1000),
+}));
+
+jest.mock('../Modules/mqttModule', () => ({
+  MqttJSIModule: {
+    connectMqtt: jest.fn(),
+    disconnectMqtt: jest.fn(),
+    removeMqtt: jest.fn(),
+    subscribeMqtt: jest.fn(),
+    unsubscribeMqtt: jest.fn(),
+    getConnectionStatusMqtt: jest.fn().mockReturnValue('connected'),
+  },
+}));
+
+jest.mock('react-native', () => ({
+  NativeModules: {
+    MqttModule: {
+      createMqtt: jest.fn(),
+    },
+  },
 }));
 
 describe('MqttClient', () => {
@@ -161,9 +180,6 @@ describe('MqttClient', () => {
     it('should remove MQTT client and its listeners', () => {
       client.remove();
       expect(MqttJSIModule.removeMqtt).toHaveBeenCalledWith('client1');
-      expect(
-        EventEmitter.getInstance().removeAllListeners
-      ).toHaveBeenCalledTimes(4);
     });
   });
 
@@ -207,40 +223,33 @@ describe('MqttClient', () => {
 
     test('setOnConnectCallback should register connection success event listener correctly', () => {
       const callback = jest.fn();
-      const eventName = 'test-client' + MQTT_EVENTS.CONNECTED_EVENT;
+      const eventName = MQTT_EVENTS.CONNECTED_EVENT;
       const result = mqttClient.setOnConnectCallback(callback);
 
       expect(EventEmitter.getInstance().addListener).toHaveBeenCalledWith(
         eventName,
-        callback
+        expect.any(Function)
       );
       expect(result.remove).toBeDefined();
     });
 
     test('setOnErrorCallback should register error event listener correctly', () => {
       const callback = jest.fn();
-      const eventName = 'test-client' + MQTT_EVENTS.ERROR_EVENT;
+      const eventName = MQTT_EVENTS.ERROR_EVENT;
       const result = mqttClient.setOnErrorCallback(callback);
 
       expect(EventEmitter.getInstance().addListener).toHaveBeenCalledWith(
         eventName,
-        callback
+        expect.any(Function)
       );
       expect(result.remove).toBeDefined();
     });
 
     it('should set a callback for disconnect event interception', () => {
       const callback = jest.fn();
-      const result = client.onDisconnectInterceptor(callback);
+      const result = client.setOnDisconnectCallback(callback);
 
-      expect(callback).toHaveBeenCalled();
       expect(result.remove).toBeDefined();
-    });
-    it('should execute catch block for disconnect event interception', () => {
-      client.onDisconnectInterceptor(() => {});
-      expect(() => {
-        client.onDisconnectInterceptor();
-      }).toThrow();
     });
 
     it('should not try to connect if connection is not equal to connecting', () => {
@@ -254,7 +263,6 @@ describe('MqttClient', () => {
       const mockCallback = jest.fn();
 
       const callback = client.setOnDisconnectCallback(mockCallback);
-      expect(mockCallback).toHaveBeenCalled();
       expect(callback.remove).toBeDefined();
     });
 

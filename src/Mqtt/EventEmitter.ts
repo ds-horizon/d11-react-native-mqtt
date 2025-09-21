@@ -1,4 +1,4 @@
-import { NativeEventEmitter } from 'react-native';
+import { NativeEventEmitter, Platform } from 'react-native';
 import { MqttModule } from '../Modules/mqttModule';
 
 /**
@@ -7,10 +7,12 @@ import { MqttModule } from '../Modules/mqttModule';
  * The singleton pattern is implemented using an Immediately Invoked Function Expression (IIFE).
  */
 export const EventEmitter = (function () {
-  var instance: EventEmitter;
+  var instance: EventEmitter | undefined;
 
   function createInstance() {
-    return new NativeEventEmitter(MqttModule);
+    return new NativeEventEmitter(
+      Platform.OS === 'ios' ? MqttModule : undefined
+    );
   }
 
   return {
@@ -24,6 +26,9 @@ export const EventEmitter = (function () {
         instance = createInstance();
       }
       return instance;
+    },
+    resetInstance: function () {
+      instance = undefined;
     },
   };
 })();

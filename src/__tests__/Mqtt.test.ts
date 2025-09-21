@@ -9,9 +9,9 @@ jest.mock('../Mqtt/EventEmitter.ts', () => {
   const mEventEmitter = {
     getInstance: jest.fn(),
     addListener: jest.fn((_, callback) => {
-      setTimeout(() => {
-        callback({ clientInit: true });
-      }, 0);
+      setImmediate(() => {
+        callback({ clientInit: true, clientId: 'test-client-id' });
+      });
       return { remove };
     }),
     removeAllListeners: jest.fn(),
@@ -19,6 +19,14 @@ jest.mock('../Mqtt/EventEmitter.ts', () => {
   mEventEmitter.getInstance.mockReturnValue(mEventEmitter);
   return { EventEmitter: mEventEmitter };
 });
+
+jest.mock('react-native', () => ({
+  NativeModules: {
+    MqttModule: {
+      createMqtt: jest.fn(),
+    },
+  },
+}));
 
 describe('createMqttClient', () => {
   const clientId = 'test-client-id';
@@ -29,45 +37,47 @@ describe('createMqttClient', () => {
 
   it('should resolve with an MqttClient instance if client initialization is successful', async () => {
     const client = await createMqttClient(config);
-    await expect(EventEmitter.getInstance).toHaveBeenCalled();
-    await expect(EventEmitter.getInstance().addListener).toHaveBeenCalledWith(
-      clientId + MQTT_EVENTS.CLIENT_INITIALIZE_EVENT,
+    expect(EventEmitter.getInstance).toHaveBeenCalled();
+    expect(EventEmitter.getInstance().addListener).toHaveBeenCalledWith(
+      MQTT_EVENTS.CLIENT_INITIALIZE_EVENT,
       expect.any(Function)
     );
-    await expect(client).toBeInstanceOf(MqttClient);
+    expect(client).toBeInstanceOf(MqttClient);
   });
 
   it('should correctly instantiate MqttClient with provided config with auto-reconnect', async () => {
     const client = await createMqttClient({ ...config, autoReconnect: true });
-    await expect(EventEmitter.getInstance).toHaveBeenCalled();
-    await expect(EventEmitter.getInstance().addListener).toHaveBeenCalledWith(
-      clientId + MQTT_EVENTS.CLIENT_INITIALIZE_EVENT,
+    expect(EventEmitter.getInstance).toHaveBeenCalled();
+    expect(EventEmitter.getInstance().addListener).toHaveBeenCalledWith(
+      MQTT_EVENTS.CLIENT_INITIALIZE_EVENT,
       expect.any(Function)
     );
-    await expect(client).toBeInstanceOf(MqttClient);
+    expect(client).toBeInstanceOf(MqttClient);
   });
 
   it('should resolve with undefined if client initialization fails', async () => {
     EventEmitter.getInstance().addListener = jest.fn((_, callback) => {
-      callback({ clientInit: false });
+      setImmediate(() => {
+        callback({ clientInit: false, clientId });
+      });
       return { remove: jest.fn() };
     });
     const client = await createMqttClient(config);
-    await expect(EventEmitter.getInstance).toHaveBeenCalled();
-    await expect(EventEmitter.getInstance().addListener).toHaveBeenCalledWith(
-      clientId + MQTT_EVENTS.CLIENT_INITIALIZE_EVENT,
+    expect(EventEmitter.getInstance).toHaveBeenCalled();
+    expect(EventEmitter.getInstance().addListener).toHaveBeenCalledWith(
+      MQTT_EVENTS.CLIENT_INITIALIZE_EVENT,
       expect.any(Function)
     );
-    await expect(client).toBeUndefined();
+    expect(client).toBeUndefined();
   });
 
   it('should resolve with undefined if client host is not provided', async () => {
     const client = await createMqttClient({ clientId, port, options });
-    await expect(EventEmitter.getInstance).toHaveBeenCalled();
-    await expect(EventEmitter.getInstance().addListener).toHaveBeenCalledWith(
-      clientId + MQTT_EVENTS.CLIENT_INITIALIZE_EVENT,
+    expect(EventEmitter.getInstance).toHaveBeenCalled();
+    expect(EventEmitter.getInstance().addListener).toHaveBeenCalledWith(
+      MQTT_EVENTS.CLIENT_INITIALIZE_EVENT,
       expect.any(Function)
     );
-    await expect(client).toBeUndefined();
+    expect(client).toBeUndefined();
   });
 });

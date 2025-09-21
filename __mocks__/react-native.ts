@@ -7,6 +7,10 @@ const NativeModules = {
   },
 };
 
+const Platform = {
+  OS: 'ios', // Default to iOS for testing
+};
+
 const mockedMqttClass = jest.fn();
 
 class NativeEventEmitter {
@@ -15,4 +19,4 @@ class NativeEventEmitter {
   }
 }
 
-export { NativeModules, NativeEventEmitter, mockedMqttClass };
+export { NativeModules, NativeEventEmitter, mockedMqttClass, Platform };

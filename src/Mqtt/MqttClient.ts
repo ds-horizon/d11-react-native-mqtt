@@ -203,17 +203,23 @@ export class MqttClient {
   private onDisconnectInterceptor(
     callback: (ack: MqttEventsInterface[MQTT_EVENTS.DISCONNECTED_EVENT]) => void
   ) {
-    const event = this.clientId + MQTT_EVENTS.DISCONNECTED_EVENT;
+    const event = MQTT_EVENTS.DISCONNECTED_EVENT;
     const listener = this.eventEmitter.addListener(
       event,
-      (ack: MqttEventsInterface[MQTT_EVENTS.DISCONNECTED_EVENT]) => {
-        try {
-          callback(ack);
-        } catch (e) {
-          callback({
-            reasonCode: Mqtt5ReasonCode.DEFAULT,
-            errorMessage: e instanceof Error ? e.message : 'Unknown error',
-          });
+      (
+        ack: MqttEventsInterface[MQTT_EVENTS.DISCONNECTED_EVENT] & {
+          clientId: string;
+        }
+      ) => {
+        if (ack.clientId === this.clientId) {
+          try {
+            callback(ack);
+          } catch (e) {
+            callback({
+              reasonCode: Mqtt5ReasonCode.DEFAULT,
+              errorMessage: e instanceof Error ? e.message : 'Unknown error',
+            });
+          }
         }
       }
     );
@@ -308,16 +314,32 @@ export class MqttClient {
     MqttJSIModule.subscribeMqtt(eventId, this.clientId, topic, qos);
 
     const listener = this.eventEmitter.addListener<
-      MqttEventsInterface[MQTT_EVENTS.SUBSCRIPTION_EVENT]
-    >(eventId, onEvent);
+      MqttEventsInterface[MQTT_EVENTS.SUBSCRIPTION_EVENT] & { eventId: string }
+    >(MQTT_EVENTS.SUBSCRIPTION_EVENT, (data) => {
+      if (data.eventId === eventId) {
+        onEvent(data);
+      }
+    });
 
     const success = this.eventEmitter.addListener<
-      MqttEventsInterface[MQTT_EVENTS.SUBSCRIPTION_SUCCESS_EVENT]
-    >(eventId + MQTT_EVENTS.SUBSCRIPTION_SUCCESS_EVENT, onSuccess);
+      MqttEventsInterface[MQTT_EVENTS.SUBSCRIPTION_SUCCESS_EVENT] & {
+        eventId: string;
+      }
+    >(MQTT_EVENTS.SUBSCRIPTION_SUCCESS_EVENT, (data) => {
+      if (data.eventId === eventId) {
+        onSuccess(data);
+      }
+    });
 
     const failed = this.eventEmitter.addListener<
-      MqttEventsInterface[MQTT_EVENTS.SUBSCRIPTION_FAILED_EVENT]
-    >(eventId + MQTT_EVENTS.SUBSCRIPTION_FAILED_EVENT, onError);
+      MqttEventsInterface[MQTT_EVENTS.SUBSCRIPTION_FAILED_EVENT] & {
+        eventId: string;
+      }
+    >(MQTT_EVENTS.SUBSCRIPTION_FAILED_EVENT, (data) => {
+      if (data.eventId === eventId) {
+        onError(data);
+      }
+    });
 
     return {
       remove: () => {
@@ -346,20 +368,7 @@ export class MqttClient {
 
     clearTimeout(this.retryTimer);
 
-    this.eventEmitter.removeAllListeners(
-      this.clientId + MQTT_EVENTS.DISCONNECTED_EVENT
-    );
-    this.eventEmitter.removeAllListeners(
-      this.clientId + MQTT_EVENTS.CONNECTED_EVENT
-    );
-
-    this.eventEmitter.removeAllListeners(
-      this.clientId + MQTT_EVENTS.CLIENT_INITIALIZE_EVENT
-    );
-
-    this.eventEmitter.removeAllListeners(
-      this.clientId + MQTT_EVENTS.ERROR_EVENT
-    );
+    // Individual listeners will be removed when their subscription objects are called
   }
 
   /**
@@ -433,8 +442,19 @@ export class MqttClient {
   setOnConnectCallback(
     callback: (ack: MqttEventsInterface[MQTT_EVENTS.CONNECTED_EVENT]) => void
   ) {
-    const eventName = this.clientId + MQTT_EVENTS.CONNECTED_EVENT;
-    const listener = this.eventEmitter.addListener(eventName, callback);
+    const eventName = MQTT_EVENTS.CONNECTED_EVENT;
+    const listener = this.eventEmitter.addListener(
+      eventName,
+      (
+        ack: MqttEventsInterface[MQTT_EVENTS.CONNECTED_EVENT] & {
+          clientId: string;
+        }
+      ) => {
+        if (ack.clientId === this.clientId) {
+          callback(ack);
+        }
+      }
+    );
     return {
       remove: listener.remove,
     };
@@ -448,8 +468,17 @@ export class MqttClient {
   setOnErrorCallback(
     callback: (ack: MqttEventsInterface[MQTT_EVENTS.ERROR_EVENT]) => void
   ) {
-    const eventName = this.clientId + MQTT_EVENTS.ERROR_EVENT;
-    const listener = this.eventEmitter.addListener(eventName, callback);
+    const eventName = MQTT_EVENTS.ERROR_EVENT;
+    const listener = this.eventEmitter.addListener(
+      eventName,
+      (
+        ack: MqttEventsInterface[MQTT_EVENTS.ERROR_EVENT] & { clientId: string }
+      ) => {
+        if (ack.clientId === this.clientId) {
+          callback(ack);
+        }
+      }
+    );
     return {
       remove: listener.remove,
     };

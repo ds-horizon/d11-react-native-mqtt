@@ -8,7 +8,7 @@ import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.WritableMap
 import com.facebook.react.module.annotations.ReactModule
-import com.facebook.react.modules.core.DeviceEventManagerModule
+import com.facebook.react.modules.core.DeviceEventManagerModule.RCTDeviceEventEmitter
 import java.io.Serializable
 
 @ReactModule(name = MqttModuleImpl.NAME)
@@ -29,6 +29,7 @@ class MqttModuleImpl(reactContext: ReactApplicationContext?) :
     override fun getName(): String {
       return NAME
     }
+
 
     private external fun nativeInstallJSIBindings(runtimePtr: Long)
 
@@ -65,10 +66,10 @@ class MqttModuleImpl(reactContext: ReactApplicationContext?) :
         }
   }
 
-    private fun emitJsiEvent(eventId: String, payload: HashMap<String, Any>) {
+    private fun emitJsiEvent(eventName: String, payload: HashMap<String, Any>) {
         reactApplicationContext
-            .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
-            .emit(eventId, MapUtils.toWritableMap(payload))
+            .getJSModule(RCTDeviceEventEmitter::class.java)
+            .emit(eventName, MapUtils.toWritableMap(payload))
     }
 
     override fun removeMqtt(clientId: String) {
@@ -100,5 +101,10 @@ class MqttModuleImpl(reactContext: ReactApplicationContext?) :
     override fun getConnectionStatusMqtt(clientId: String): String {
         return MqttManager.getConnectionStatusMqtt(clientId)
       Log.d("::::D11MQTT",":::: getConnectionStatusMqtt called via jsi bridge")
+    }
+
+    @ReactMethod
+    fun removeListeners(count: Int) {
+
     }
 }

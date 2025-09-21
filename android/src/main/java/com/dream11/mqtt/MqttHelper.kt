@@ -19,6 +19,7 @@ class MqttHelper(
 ) {
   private lateinit var mqtt: Mqtt5RxClient
   private val subscriptionMap: HashMap<String, HashMap<String, Subscription>> = HashMap()
+  private var isManuallyDisconnecting = false
 
   companion object {
     const val CLIENT_INITIALIZE_EVENT = "client_initialize"
@@ -26,6 +27,7 @@ class MqttHelper(
     const val DISCONNECTED_EVENT = "disconnected"
     const val SUBSCRIBE_SUCCESS = "subscribe_success"
     const val SUBSCRIBE_FAILED = "subscribe_failed"
+    const val SUBSCRIPTION_EVENT = "subscription_event"
     const val ERROR_EVENT = "mqtt_error"
 
     const val CONNECTED = "connected"
@@ -62,6 +64,7 @@ class MqttHelper(
 
           var errorMessage = ""
           val params = HashMap<String, Any>().apply {
+            put("clientId", clientId)
             put("reasonCode", connPayload ?: disconnectPayload ?: DISCONNECTION_ERROR)
             errorMessage = try {
               disconnectedContext.cause.message ?: "Unknown error"
@@ -70,13 +73,15 @@ class MqttHelper(
             }
             put("errorMessage", errorMessage)
           }
-          emitJsiEvent(clientId + DISCONNECTED_EVENT, params)
+          emitJsiEvent(DISCONNECTED_EVENT, params)
         }
         .addConnectedListener {
+          isManuallyDisconnecting = false // Reset flag on successful connection
           val params = HashMap<String, Any>().apply {
+            put("clientId", clientId)
             put("reasonCode", 0)
           }
-          emitJsiEvent(clientId + CONNECTED_EVENT, params)
+          emitJsiEvent(CONNECTED_EVENT, params)
         }
         .serverHost(host)
         .serverPort(port)
@@ -92,19 +97,21 @@ class MqttHelper(
 
       if (this::mqtt.isInitialized) {
         val params = HashMap<String, Any>().apply {
+          put("clientId", clientId)
           put("clientInit", true)
         }
-        emitJsiEvent(clientId + CLIENT_INITIALIZE_EVENT, params)
+        emitJsiEvent(CLIENT_INITIALIZE_EVENT, params)
       }
     } catch (e: Exception) {
       Log.e("MQTT init", "Initialization failed: ${e.message}")
       val params = HashMap<String, Any>().apply {
+        put("clientId", clientId)
         put("clientInit", false)
         put("errorMessage", e.message.toString())
         put("errorType", "INITIALIZATION")
         put("reasonCode", INITIALIZATION_ERROR)
       }
-      emitJsiEvent(clientId + ERROR_EVENT, params)
+      emitJsiEvent(ERROR_EVENT, params)
     }
   }
 
@@ -130,13 +137,14 @@ class MqttHelper(
       .doOnError { error ->
         Log.e("MQTT Connect", " onError " + error.message + ":" + error.cause)
         val params = HashMap<String, Any>().apply {
+          put("clientId", clientId)
           put("clientConnected", false)
           put("errorMessage", error.message.toString())
           put("errorCause", error.cause.toString())
           put("errorType", "CONNECTION")
           put("reasonCode", CONNECTION_ERROR)
         }
-        emitJsiEvent(clientId + ERROR_EVENT, params)
+        emitJsiEvent(ERROR_EVENT, params)
       }
       .subscribe(
         {},
@@ -149,6 +157,7 @@ class MqttHelper(
   }
 
   fun disconnectMqtt() {
+    isManuallyDisconnecting = true
     val disposable: Disposable = mqtt.disconnect()
       .doOnComplete {
         Log.d(
@@ -166,11 +175,12 @@ class MqttHelper(
          * Will be triggered when disconnection failed. Ideally this can happen when connection is already disconnected.
          */
         val params = HashMap<String, Any>().apply {
+          put("clientId", clientId)
           put("clientDisconnected", false)
           put("errorMessage", error.message.toString())
           put("reasonCode", DISCONNECTION_ERROR)
         }
-        emitJsiEvent(clientId + DISCONNECTED_EVENT, params)
+        emitJsiEvent(DISCONNECTED_EVENT, params)
       }
       .subscribe(
         {},
@@ -190,31 +200,37 @@ class MqttHelper(
         Log.e("MQTT Subscribe", "" + subAck.reasonString)
 
         val params = HashMap<String, Any>().apply {
+          put("eventId", eventId)
           put("message", subAck.reasonString.toString())
           put("topic", topic)
           put("qos", (MqttQos.fromCode(qos) ?: MqttQos.AT_MOST_ONCE).code)
         }
-        emitJsiEvent(eventId + SUBSCRIBE_SUCCESS, params)
+        emitJsiEvent(SUBSCRIBE_SUCCESS, params)
       }
       .doOnNext { publish ->
         val params = HashMap<String, Any>().apply {
+          put("eventId", eventId)
           put("payload", String(publish.payloadAsBytes))
           put("topic", publish.topic.toString())
           put("qos", publish.qos.code)
         }
-        emitJsiEvent(eventId, params)
+        emitJsiEvent(SUBSCRIPTION_EVENT, params)
       }
       .doOnError { error ->
         Log.e(
           "MQTT Subscribe",
           "" + error.message
         ) // TODO: Replace with LogWrapper when available on bridge
-        val params = HashMap<String, Any>().apply {
-          put("clientSubscribed", false)
-          put("errorMessage", error.message.toString())
-          put("reasonCode", SUBSCRIPTION_ERROR)
+        
+        if (!isManuallyDisconnecting) {
+          val params = HashMap<String, Any>().apply {
+            put("eventId", eventId)
+            put("clientSubscribed", false)
+            put("errorMessage", error.message.toString())
+            put("reasonCode", SUBSCRIPTION_ERROR)
+          }
+          emitJsiEvent(SUBSCRIBE_FAILED, params)
         }
-        emitJsiEvent(eventId + SUBSCRIBE_FAILED, params)
       }
       .subscribe(
         {},
@@ -251,13 +267,14 @@ class MqttHelper(
           // TODO: Replace with LogWrapper when available on bridge
           Log.e("MQTT Unsubscribe", "" + error.message)
           val params = HashMap<String, Any>().apply {
+            put("clientId", clientId)
             put("clientUnsubscribed", false)
             put("errorMessage", error.message.toString())
             put("errorType", "UNSUBSCRIPTION")
             put("topic", topic)
             put("reasonCode", UNSUBSCRIPTION_ERROR)
           }
-          emitJsiEvent(clientId + ERROR_EVENT, params)
+          emitJsiEvent(ERROR_EVENT, params)
         }
         .subscribe(
           {},

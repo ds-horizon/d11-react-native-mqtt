@@ -1,6 +1,6 @@
 # d11-react-native-mqtt
 
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/dream-sports-labs/d11-react-native-mqtt)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/ds-horizon/d11-react-native-mqtt)
 
 Message Queuing Telemetry Transport (MQTT) is a lightweight, efficient, and reliable messaging protocol designed for low-bandwidth, high-latency, or unreliable networks.
 

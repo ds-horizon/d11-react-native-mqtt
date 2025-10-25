@@ -38,13 +38,13 @@
     "ios",
     "android"
   ],
-  "repository": "https://github.com/dream-sports-labs/d11-react-native-mqtt.git",
-  "author": "Dream Sports Labs <dreamsportslabs@dream11.com> (https://github.com/dream-sports-labs)",
+  "repository": "https://github.com/ds-horizon/d11-react-native-mqtt.git",
+  "author": "Dream Sports Labs <dreamsportslabs@dream11.com> (https://github.com/ds-horizon)",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/dream-sports-labs/d11-react-native-mqtt.git/issues"
+    "url": "https://github.com/ds-horizon/d11-react-native-mqtt.git/issues"
   },
-  "homepage": "https://github.com/dream-sports-labs/d11-react-native-mqtt.git#readme",
+  "homepage": "https://github.com/ds-horizon/d11-react-native-mqtt.git#readme",
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
